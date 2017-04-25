@@ -112,6 +112,9 @@ class SimpleFlowNodelet : public opencv_apps::Nodelet
     // Work on the image.
     try
     {
+
+      static ros::Time prev_time;
+
       // Convert the image into something opencv can handle.
       cv::Mat frame_src = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::BGR8)->image;
 
@@ -125,7 +128,10 @@ class SimpleFlowNodelet : public opencv_apps::Nodelet
 
       cv::resize(frame, gray, cv::Size(frame.cols/(double)MAX(1,scale_), frame.rows/(double)MAX(1,scale_)), 0, 0, CV_INTER_AREA);
       if(prevGray.empty())
+      {
         gray.copyTo(prevGray);
+        prev_time = msg->header.stamp;
+      }
 
       if (gray.rows != prevGray.rows && gray.cols != prevGray.cols) {
         NODELET_WARN("Images should be of equal sizes");
@@ -160,7 +166,7 @@ class SimpleFlowNodelet : public opencv_apps::Nodelet
 #endif
                             flow,
                             3, 2, 4, 4.1, 25.5, 18, 55.0, 25.5, 0.35, 18, 55.0, 25.5, 10);
-      NODELET_INFO("calcOpticalFlowSF : %lf sec", (cv::getTickCount() - start) / cv::getTickFrequency());
+//      NODELET_INFO("calcOpticalFlowSF : %lf sec", (cv::getTickCount() - start) / cv::getTickFrequency());
 
       //writeOpticalFlowToFile(flow, file);
       int cols = flow.cols;
@@ -180,7 +186,10 @@ class SimpleFlowNodelet : public opencv_apps::Nodelet
           point_msg.x = scale_col*j;
           point_msg.y = scale_row*i;
           velocity_msg.x = scale_col*flow_at_point[0];
+          double dt = (msg->header.stamp - prev_time).toSec();
+//          velocity_msg.x = 1.0/538.558743*velocity_msg.x / dt;
           velocity_msg.y = scale_row*flow_at_point[1];
+//          velocity_msg.y = 1.0/538.558743*velocity_msg.y / dt;
           flow_msg.point = point_msg;
           flow_msg.velocity = velocity_msg;
           flows_msg.flow.push_back(flow_msg);
@@ -233,7 +242,7 @@ public:
     Nodelet::onInit();
     it_ = boost::shared_ptr<image_transport::ImageTransport>(new image_transport::ImageTransport(*nh_));
 
-    pnh_->param("debug_view", debug_view_, false);
+    pnh_->param("debug_view", debug_view_, true);
     if (debug_view_) {
       always_subscribe_ = true;
     }
